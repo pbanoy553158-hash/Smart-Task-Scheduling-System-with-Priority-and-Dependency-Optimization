@@ -46,15 +46,17 @@ class TaskSchedulerGUI:
         left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 10))
         left_panel.pack_propagate(False)
         
+        # System Selection
         sys_frame = ttk.LabelFrame(left_panel, text="System Selection", padding=10)
         sys_frame.pack(fill=tk.X, pady=(0, 10))
         
         self.system_var = tk.StringVar(value="baseline")
-        ttk.Radiobutton(sys_frame, text="Baseline System (ArrayList, Linear Search, Bubble Sort)", 
+        ttk.Radiobutton(sys_frame, text="Baseline System (List, Linear Search, Bubble Sort)", 
                         variable=self.system_var, value="baseline", command=self.switch_system).pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(sys_frame, text="Optimized System (Graph, Heap, HashMap, Merge Sort)", 
                         variable=self.system_var, value="optimized", command=self.switch_system).pack(anchor=tk.W, pady=2)
         
+        # Load Section
         load_frame = ttk.LabelFrame(left_panel, text="Load Tasks", padding=10)
         load_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -62,6 +64,7 @@ class TaskSchedulerGUI:
         ttk.Button(load_frame, text="Load 500 Tasks", command=lambda: self.load_tasks(500)).pack(fill=tk.X, pady=2)
         ttk.Button(load_frame, text="Load 1000 Tasks", command=lambda: self.load_tasks(1000)).pack(fill=tk.X, pady=2)
         
+        # Search Section
         search_frame = ttk.LabelFrame(left_panel, text="Search Task", padding=10)
         search_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -72,16 +75,20 @@ class TaskSchedulerGUI:
         
         ttk.Button(search_frame, text="Search", command=self.search_task).pack(fill=tk.X)
         
-        sort_frame = ttk.LabelFrame(left_panel, text="Sort Tasks", padding=10)
+        # Sort Section with FCFS
+        sort_frame = ttk.LabelFrame(left_panel, text="Sort & Schedule Tasks", padding=10)
         sort_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Button(sort_frame, text="Sort by Deadline", command=self.sort_by_deadline).pack(fill=tk.X, pady=2)
         ttk.Button(sort_frame, text="Sort by Priority", command=self.sort_by_priority).pack(fill=tk.X, pady=2)
+        ttk.Button(sort_frame, text="FCFS Schedule (Insertion Order)", command=self.fcfs_schedule).pack(fill=tk.X, pady=2)
         
+        # Optimized Only Section
         self.optimized_frame = ttk.LabelFrame(left_panel, text="Optimized Algorithms (Optimized System Only)", padding=10)
         ttk.Button(self.optimized_frame, text="Heap Schedule (Priority Order)", command=self.heap_schedule).pack(fill=tk.X, pady=2)
         ttk.Button(self.optimized_frame, text="Topological Sort (Dependency Order)", command=self.topological_sort).pack(fill=tk.X, pady=2)
         
+        # Info Section
         info_frame = ttk.LabelFrame(left_panel, text="System Info", padding=10)
         info_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -90,20 +97,24 @@ class TaskSchedulerGUI:
         self.complexity_label = ttk.Label(info_frame, text="Complexity: O(n)")
         self.complexity_label.pack(anchor=tk.W)
         
+        # Right Panel - Tabs
         right_panel = ttk.Frame(main_frame)
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
         
         self.notebook = ttk.Notebook(right_panel)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
+        # Task List Tab
         self.task_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.task_frame, text="Task List")
         self.setup_task_table()
         
+        # Performance Results Tab
         self.results_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.results_frame, text="Performance Results")
         self.setup_results_table()
         
+        # Log Tab
         self.log_frame = ttk.Frame(self.notebook)
         self.notebook.add(self.log_frame, text="Log")
         
@@ -138,7 +149,7 @@ class TaskSchedulerGUI:
         self.current_system = system
         if system == "baseline":
             self.scheduler = BaselineScheduler()
-            self.complexity_label.config(text="Complexity: Linear Search O(n) | Bubble Sort O(n²)")
+            self.complexity_label.config(text="Complexity: Linear Search O(n) | Bubble Sort O(n²) | FCFS O(n)")
             self.optimized_frame.pack_forget()
             self.log("Switched to BASELINE System")
         else:
@@ -166,7 +177,7 @@ class TaskSchedulerGUI:
             self.root.after(0, self.update_task_table)
             self.root.after(0, lambda: self.task_count_label.config(text=f"Tasks Loaded: {count}"))
             operation = f"LOAD ({self.current_system.upper()})"
-            algorithm = "ArrayList.addAll()" if self.current_system == "baseline" else "HashMap + Heap + Graph"
+            algorithm = "List.append()" if self.current_system == "baseline" else "HashMap + Heap + Graph"
             complexity = "O(n)" if self.current_system == "baseline" else "O(1)+O(log n)+O(V)"
             self.root.after(0, lambda: self.add_result(operation, count, time_ms, algorithm, complexity))
             self.root.after(0, lambda: self.log(f"✅ Loaded {count} tasks in {time_ms:.4f} ms"))
@@ -198,7 +209,7 @@ class TaskSchedulerGUI:
                 self.root.after(0, lambda: self.log(f"❌ NOT FOUND '{search_id}' in {time_ms:.4f} ms"))
                 messagebox.showwarning("Task Not Found", f"Task '{search_id}' not found!")
             operation = f"SEARCH ({self.current_system.upper()})"
-            algorithm = "Linear Scan" if self.current_system == "baseline" else "HashMap.get()"
+            algorithm = "Linear Scan" if self.current_system == "baseline" else "Dictionary.get()"
             complexity = "O(n)" if self.current_system == "baseline" else "O(1) avg"
             self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algorithm, complexity))
         Thread(target=search).start()
@@ -250,6 +261,20 @@ class TaskSchedulerGUI:
             self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algorithm, complexity))
             self.root.after(0, lambda: self.log(f"✅ Sort by priority completed in {time_ms:.4f} ms"))
         Thread(target=sort_priority).start()
+    
+    def fcfs_schedule(self):
+        """Display tasks in FCFS order (insertion order)"""
+        if not self.current_tasks:
+            self.log("No tasks loaded. Please load tasks first.")
+            messagebox.showwarning("No Tasks", "Please load tasks first!")
+            return
+        
+        self.log("Displaying FCFS Schedule (Insertion Order)...")
+        
+        # FCFS just returns tasks in current order (insertion order)
+        scheduled = self.scheduler.fcfs_schedule()
+        self.display_schedule(scheduled, "FCFS Schedule - First Come First Served")
+        self.log(f"✅ FCFS schedule generated - {len(scheduled)} tasks in insertion order")
     
     def heap_schedule(self):
         if self.current_system != "optimized":
