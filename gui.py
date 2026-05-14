@@ -1,12 +1,15 @@
 """
-Smart Task Scheduling System - Complete GUI
+Smart Task Scheduling System - COMPLETE & FULLY FUNCTIONAL
+FIXED: Time measurement with proper precision
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
 import time
+import gc
 from threading import Thread
 import sys
 import os
+from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -50,7 +53,7 @@ class TaskSchedulerGUI:
         sys_frame.pack(fill=tk.X, pady=(0, 10))
         
         self.system_var = tk.StringVar(value="baseline")
-        ttk.Radiobutton(sys_frame, text="Baseline System (ArrayList, Linear Search, Bubble Sort)", 
+        ttk.Radiobutton(sys_frame, text="Baseline System (List, Linear Search, Bubble Sort)", 
                         variable=self.system_var, value="baseline", command=self.switch_system).pack(anchor=tk.W, pady=2)
         ttk.Radiobutton(sys_frame, text="Optimized System (Graph, Heap, HashMap, Merge Sort)", 
                         variable=self.system_var, value="optimized", command=self.switch_system).pack(anchor=tk.W, pady=2)
@@ -75,8 +78,8 @@ class TaskSchedulerGUI:
         sort_frame = ttk.LabelFrame(left_panel, text="Sort Tasks", padding=10)
         sort_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Button(sort_frame, text="Sort by Deadline", command=self.sort_by_deadline).pack(fill=tk.X, pady=2)
-        ttk.Button(sort_frame, text="Sort by Priority", command=self.sort_by_priority).pack(fill=tk.X, pady=2)
+        ttk.Button(sort_frame, text="Sort by Deadline (Earliest First)", command=self.sort_by_deadline).pack(fill=tk.X, pady=2)
+        ttk.Button(sort_frame, text="Sort by Priority (Critical First)", command=self.sort_by_priority).pack(fill=tk.X, pady=2)
         
         self.optimized_frame = ttk.LabelFrame(left_panel, text="Optimized Algorithms (Optimized System Only)", padding=10)
         ttk.Button(self.optimized_frame, text="Heap Schedule (Priority Order)", command=self.heap_schedule).pack(fill=tk.X, pady=2)
@@ -112,7 +115,7 @@ class TaskSchedulerGUI:
     
     def setup_task_table(self):
         columns = ("ID", "Task Name", "Priority", "Deadline", "Status", "Prerequisites")
-        self.task_tree = ttk.Treeview(self.task_frame, columns=columns, show="headings", height=25)
+        self.task_tree = ttk.Treeview(self.task_frame, columns=columns, show="headings", height=35)
         for col in columns:
             self.task_tree.heading(col, text=col)
             widths = {"ID": 90, "Task Name": 180, "Priority": 100, "Deadline": 100, "Status": 80, "Prerequisites": 150}
@@ -153,23 +156,42 @@ class TaskSchedulerGUI:
     def load_tasks(self, count):
         self.log(f"Loading {count} tasks...")
         def load():
+            # Use perf_counter for high precision
             start_time = time.perf_counter()
+            
             if self.current_system == "optimized":
-                tasks = generate_tasks_with_dependencies(count, 30)
+                tasks = generate_tasks_with_dependencies(count, 40)
                 self.scheduler.load_tasks_with_dependencies(tasks)
             else:
                 tasks = generate_tasks(count)
                 self.scheduler.load_tasks(tasks)
+            
             end_time = time.perf_counter()
+            
             time_ms = (end_time - start_time) * 1000
             self.current_tasks = tasks
+            
+            actual_count = len(self.current_tasks)
+            self.root.after(0, lambda: self.log(f"📊 Loaded exactly {actual_count} tasks in {time_ms:.4f} ms"))
+            
+            # Log priority distribution
+            priority_counts = Counter(t.get_priority_label() for t in self.current_tasks)
+            self.root.after(0, lambda: self.log(f"📊 Priority distribution: {dict(priority_counts)}"))
+            
+            # Log dependency count
+            deps_count = sum(1 for t in self.current_tasks if t.prerequisites)
+            total_deps = sum(len(t.prerequisites) for t in self.current_tasks)
+            self.root.after(0, lambda: self.log(f"📊 Dependencies: {deps_count} tasks have prerequisites, {total_deps} total edges"))
+            
             self.root.after(0, self.update_task_table)
-            self.root.after(0, lambda: self.task_count_label.config(text=f"Tasks Loaded: {count}"))
+            self.root.after(0, lambda: self.task_count_label.config(text=f"Tasks Loaded: {actual_count}"))
+            
             operation = f"LOAD ({self.current_system.upper()})"
-            algorithm = "ArrayList.addAll()" if self.current_system == "baseline" else "HashMap + Heap + Graph"
-            complexity = "O(n)" if self.current_system == "baseline" else "O(1)+O(log n)+O(V)"
-            self.root.after(0, lambda: self.add_result(operation, count, time_ms, algorithm, complexity))
-            self.root.after(0, lambda: self.log(f"✅ Loaded {count} tasks in {time_ms:.4f} ms"))
+            algo = "list.append()" if self.current_system == "baseline" else "HashMap + Heap + Graph"
+            complexity = "O(1) avg" if self.current_system == "baseline" else "O(1)+O(log n)+O(V+E)"
+            
+            self.root.after(0, lambda: self.add_result(operation, actual_count, time_ms, algo, complexity))
+            self.root.after(0, lambda: self.log(f"✅ Load complete"))
         Thread(target=load).start()
     
     def search_task(self):
@@ -183,24 +205,35 @@ class TaskSchedulerGUI:
             return
         self.log(f"Searching for ID: {search_id}...")
         def search():
+            # Run multiple searches for better timing
+            iterations = 100
             start_time = time.perf_counter()
+            
+            for _ in range(iterations):
+                if self.current_system == "baseline":
+                    found, _ = self.scheduler.linear_search(search_id)
+                else:
+                    found = self.scheduler.hash_search(search_id)
+            
+            end_time = time.perf_counter()
+            time_ms = ((end_time - start_time) * 1000) / iterations
+            
+            # Get the actual found task for display
             if self.current_system == "baseline":
-                found, comparisons = self.scheduler.linear_search(search_id)
+                found, _ = self.scheduler.linear_search(search_id)
             else:
                 found = self.scheduler.hash_search(search_id)
-                comparisons = 1
-            end_time = time.perf_counter()
-            time_ms = (end_time - start_time) * 1000
+            
             if found:
-                self.root.after(0, lambda: self.log(f"✅ FOUND '{search_id}' in {time_ms:.4f} ms"))
+                self.root.after(0, lambda: self.log(f"✅ FOUND '{search_id}' in {time_ms:.6f} ms (avg over {iterations} searches)"))
                 messagebox.showinfo("Task Found", f"ID: {found.id}\nName: {found.name}\nPriority: {found.get_priority_label()}\nDeadline: {found.get_formatted_deadline()}")
             else:
-                self.root.after(0, lambda: self.log(f"❌ NOT FOUND '{search_id}' in {time_ms:.4f} ms"))
+                self.root.after(0, lambda: self.log(f"❌ NOT FOUND '{search_id}' in {time_ms:.6f} ms"))
                 messagebox.showwarning("Task Not Found", f"Task '{search_id}' not found!")
             operation = f"SEARCH ({self.current_system.upper()})"
-            algorithm = "Linear Scan" if self.current_system == "baseline" else "HashMap.get()"
+            algo = "Linear Search" if self.current_system == "baseline" else "HashMap.get()"
             complexity = "O(n)" if self.current_system == "baseline" else "O(1) avg"
-            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algorithm, complexity))
+            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algo, complexity))
         Thread(target=search).start()
     
     def sort_by_deadline(self):
@@ -208,22 +241,23 @@ class TaskSchedulerGUI:
             self.log("No tasks loaded. Please load tasks first.")
             messagebox.showwarning("No Tasks", "Please load tasks first!")
             return
-        self.log("Sorting by deadline...")
+        self.log("Sorting by deadline (earliest first)...")
         def sort_deadline():
             start_time = time.perf_counter()
             if self.current_system == "baseline":
                 self.scheduler.bubble_sort_by_deadline()
+                self.current_tasks = self.scheduler.get_tasks()
             else:
                 sorted_tasks = self.scheduler.merge_sort_by_deadline()
-                self.scheduler.load_tasks_with_dependencies(sorted_tasks)
+                self.scheduler.update_tasks_after_sort(sorted_tasks)
+                self.current_tasks = sorted_tasks
             end_time = time.perf_counter()
             time_ms = (end_time - start_time) * 1000
-            self.current_tasks = self.scheduler.get_tasks()
             self.root.after(0, self.update_task_table)
             operation = f"SORT BY DEADLINE ({self.current_system.upper()})"
-            algorithm = "Bubble Sort" if self.current_system == "baseline" else "Merge Sort"
+            algo = "Bubble Sort" if self.current_system == "baseline" else "Merge Sort"
             complexity = "O(n²)" if self.current_system == "baseline" else "O(n log n)"
-            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algorithm, complexity))
+            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algo, complexity))
             self.root.after(0, lambda: self.log(f"✅ Sort by deadline completed in {time_ms:.4f} ms"))
         Thread(target=sort_deadline).start()
     
@@ -232,22 +266,31 @@ class TaskSchedulerGUI:
             self.log("No tasks loaded. Please load tasks first.")
             messagebox.showwarning("No Tasks", "Please load tasks first!")
             return
-        self.log("Sorting by priority...")
+        
+        before_counts = Counter(t.get_priority_label() for t in self.current_tasks)
+        self.log(f"📊 Priority BEFORE sort: {dict(before_counts)}")
+        self.log("Sorting by priority (Critical first, Minimal last)...")
+        
         def sort_priority():
             start_time = time.perf_counter()
             if self.current_system == "baseline":
                 self.scheduler.bubble_sort_by_priority()
+                self.current_tasks = self.scheduler.get_tasks()
             else:
                 sorted_tasks = self.scheduler.merge_sort_by_priority()
-                self.scheduler.load_tasks_with_dependencies(sorted_tasks)
+                self.scheduler.update_tasks_after_sort(sorted_tasks)
+                self.current_tasks = sorted_tasks
             end_time = time.perf_counter()
             time_ms = (end_time - start_time) * 1000
-            self.current_tasks = self.scheduler.get_tasks()
+            
+            after_counts = Counter(t.get_priority_label() for t in self.current_tasks)
+            self.root.after(0, lambda: self.log(f"📊 Priority AFTER sort: {dict(after_counts)}"))
+            
             self.root.after(0, self.update_task_table)
             operation = f"SORT BY PRIORITY ({self.current_system.upper()})"
-            algorithm = "Bubble Sort" if self.current_system == "baseline" else "Merge Sort"
+            algo = "Bubble Sort" if self.current_system == "baseline" else "Merge Sort"
             complexity = "O(n²)" if self.current_system == "baseline" else "O(n log n)"
-            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algorithm, complexity))
+            self.root.after(0, lambda: self.add_result(operation, len(self.current_tasks), time_ms, algo, complexity))
             self.root.after(0, lambda: self.log(f"✅ Sort by priority completed in {time_ms:.4f} ms"))
         Thread(target=sort_priority).start()
     
@@ -280,50 +323,92 @@ class TaskSchedulerGUI:
             self.log("No tasks loaded. Please load tasks first.")
             messagebox.showwarning("No Tasks", "Please load tasks first!")
             return
+        
+        # Debug: Check current_tasks for prerequisites
+        deps_count = sum(1 for t in self.current_tasks if t.prerequisites)
+        self.log(f"📊 Current tasks with prerequisites: {deps_count}/{len(self.current_tasks)}")
+        
         self.log("Generating Topological Sort (Dependency Order)...")
+        
         def topo_sort():
             start_time = time.perf_counter()
             try:
                 scheduled = self.scheduler.topological_sort_schedule()
                 end_time = time.perf_counter()
                 time_ms = (end_time - start_time) * 1000
+                
+                result_with_deps = sum(1 for t in scheduled if t.prerequisites)
+                self.root.after(0, lambda: self.log(f"📊 Result tasks with prerequisites: {result_with_deps}/{len(scheduled)}"))
                 self.root.after(0, lambda: self.display_schedule(scheduled, "Topological Sort - Dependency Order"))
                 self.root.after(0, lambda: self.add_result("TOPOLOGICAL SORT", len(self.current_tasks), time_ms, "Kahn's Algorithm", "O(V+E)"))
                 self.root.after(0, lambda: self.log(f"✅ Topological sort completed in {time_ms:.4f} ms"))
             except ValueError as e:
                 self.root.after(0, lambda: self.log(f"❌ Error: {e}"))
                 messagebox.showerror("Cycle Detected", str(e))
+        
         Thread(target=topo_sort).start()
     
     def display_schedule(self, scheduled, title):
         schedule_window = tk.Toplevel(self.root)
         schedule_window.title(title)
-        schedule_window.geometry("900x600")
+        schedule_window.geometry("950x650")
         schedule_window.configure(bg='#2b2b2b')
+        
+        tasks_with_prereqs = sum(1 for task in scheduled if task.prerequisites)
+        total_prereqs = sum(len(task.prerequisites) for task in scheduled)
+        
+        info_frame = ttk.Frame(schedule_window)
+        info_frame.pack(fill=tk.X, padx=10, pady=5)
+        info_label = ttk.Label(info_frame, 
+            text=f"📊 Total: {len(scheduled)} tasks | With dependencies: {tasks_with_prereqs} | Edges: {total_prereqs}",
+            foreground='#ffcc00', background='#2b2b2b')
+        info_label.pack()
+        
+        tree_frame = ttk.Frame(schedule_window)
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         columns = ("Order", "Task ID", "Task Name", "Priority", "Deadline", "Prerequisites")
-        tree = ttk.Treeview(schedule_window, columns=columns, show="headings")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        column_widths = {"Order": 60, "Task ID": 100, "Task Name": 250, "Priority": 100, "Deadline": 100, "Prerequisites": 200}
         for col in columns:
             tree.heading(col, text=col)
-            widths = {"Order": 60, "Task ID": 100, "Task Name": 250, "Priority": 100, "Deadline": 100, "Prerequisites": 150}
-            tree.column(col, width=widths.get(col, 100))
-        for i, task in enumerate(scheduled[:200], 1):
-            prereqs = ", ".join(task.prerequisites[:2]) if task.prerequisites else "None"
-            if len(task.prerequisites) > 2:
-                prereqs += "..."
-            tree.insert("", tk.END, values=(i, task.id, task.name[:40], task.get_priority_label(), 
-                                           task.get_formatted_deadline(), prereqs))
-        tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        ttk.Button(schedule_window, text="Close", command=schedule_window.destroy).pack(pady=10)
+            tree.column(col, width=column_widths.get(col, 100))
+        
+        for i, task in enumerate(scheduled[:500], 1):
+            if task.prerequisites and len(task.prerequisites) > 0:
+                prereqs = ", ".join(str(p) for p in task.prerequisites[:3])
+                if len(task.prerequisites) > 3:
+                    prereqs += f" (+{len(task.prerequisites)-3})"
+            else:
+                prereqs = "None"
+            tree.insert("", tk.END, values=(
+                i, task.id, task.name[:45], 
+                task.get_priority_label(), 
+                task.get_formatted_deadline(), 
+                prereqs
+            ))
+        
+        button_frame = ttk.Frame(schedule_window)
+        button_frame.pack(fill=tk.X, pady=10)
+        ttk.Button(button_frame, text="Close", command=schedule_window.destroy).pack()
     
     def update_task_table(self):
         for item in self.task_tree.get_children():
             self.task_tree.delete(item)
-        for task in self.current_tasks[:200]:
-            prereqs = ", ".join(task.prerequisites[:2]) if task.prerequisites else "None"
-            if len(task.prerequisites) > 2:
-                prereqs += "..."
+        for task in self.current_tasks:
+            if task.prerequisites and len(task.prerequisites) > 0:
+                prereqs = ", ".join(task.prerequisites[:2])
+                if len(task.prerequisites) > 2:
+                    prereqs += "..."
+            else:
+                prereqs = "None"
             self.task_tree.insert("", tk.END, values=(
-                task.id, task.name[:40], task.get_priority_label(), task.get_formatted_deadline(), "Pending", prereqs
+                task.id, task.name[:40], task.get_priority_label(), 
+                task.get_formatted_deadline(), "Pending", prereqs
             ))
     
     def add_result(self, operation, count, time_ms, algorithm, complexity):
