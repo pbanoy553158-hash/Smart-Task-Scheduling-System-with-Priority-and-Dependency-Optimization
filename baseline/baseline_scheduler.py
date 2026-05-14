@@ -1,6 +1,6 @@
 """
 BASELINE SYSTEM - As specified in documentation
-Data Structure: ArrayList (Python list)
+Data Structure:  (Python list)
 Algorithms: Linear Search O(n), Bubble Sort O(n²), FCFS Scheduling
 """
 from typing import List, Optional, Tuple
