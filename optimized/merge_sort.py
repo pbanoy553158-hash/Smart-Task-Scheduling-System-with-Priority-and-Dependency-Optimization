@@ -6,7 +6,7 @@ from common.task import Task
 
 def sort_by_deadline(tasks: List[Task]) -> List[Task]:
     if tasks is None or len(tasks) <= 1:
-        return tasks
+        return tasks.copy() if tasks else []
     arr = tasks.copy()
     _merge_sort_by_deadline(arr, 0, len(arr) - 1)
     return arr
@@ -42,7 +42,7 @@ def _merge_by_deadline(arr: List[Task], left: int, mid: int, right: int) -> None
 
 def sort_by_priority(tasks: List[Task]) -> List[Task]:
     if tasks is None or len(tasks) <= 1:
-        return tasks
+        return tasks.copy() if tasks else []
     arr = tasks.copy()
     _merge_sort_by_priority(arr, 0, len(arr) - 1)
     return arr
