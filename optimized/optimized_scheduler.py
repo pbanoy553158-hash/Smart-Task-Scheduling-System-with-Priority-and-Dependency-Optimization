@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from common.task import Task
 from optimized.graph import Graph
 from optimized.min_heap import MinHeap
-from optimized.merge_sort import sort_by_deadline, sort_by_priority
+from optimized.merge_sort import sort_by_deadline  # REMOVED sort_by_priority
 
 
 class OptimizedScheduler:
@@ -86,7 +86,7 @@ class OptimizedScheduler:
         return None, len(self.tasks)
     
     # ================================================================
-    # SORT METHODS (Merge Sort)
+    # SORT METHOD (Merge Sort - Deadline only)
     # ================================================================
     
     def merge_sort_by_deadline(self) -> List[Task]:
@@ -97,19 +97,6 @@ class OptimizedScheduler:
         self.tasks = sorted_tasks
         self.task_map = {task.id: task for task in self.tasks}
         print(f"[SORT] Sorted {len(self.tasks)} tasks by deadline")
-        return self.tasks
-    
-    def merge_sort_by_priority(self) -> List[Task]:
-        """
-        O(n log n) sort by priority - NOT USED in final GUI
-        Kept for reference; Heap Schedule is used instead
-        """
-        if not self.tasks:
-            return []
-        sorted_tasks = sort_by_priority(self.tasks)
-        self.tasks = sorted_tasks
-        self.task_map = {task.id: task for task in self.tasks}
-        print(f"[SORT] Sorted {len(self.tasks)} tasks by priority")
         return self.tasks
     
     # ================================================================
